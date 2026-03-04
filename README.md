@@ -1,4 +1,5 @@
-<img width="3467" height="1044" alt="image" src="https://github.com/user-attachments/assets/42aface7-5f34-41c4-9d89-fbe620f9bcc8" />
+<img width="1699" height="1043" alt="image" src="https://github.com/user-attachments/assets/ad9eee7e-9b6d-41c4-9f62-d6e957914368" />
+
 
 # ImmunoAtlas
 
