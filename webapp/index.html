@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ImmunoAtlas | Single-cell Immune Repertoire Database</title>
+  <meta name="description"
+    content="Browse single-cell immune repertoire studies. Explore UMAP clusters and TCR/BCR clonotype data from 10x Genomics datasets.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* ── Portal-specific overrides ── */
+    html,
+    body {
+      overflow: auto;
+      height: auto;
+    }
+
+    #portal-app {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header */
+    #portal-header {
+      height: var(--header-h);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      background: var(--bg-glass);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-subtle);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      flex-shrink: 0;
+    }
+
+    /* Hero section */
+    #portal-hero {
+      padding: 56px 32px 32px;
+      background: linear-gradient(180deg,
+          rgba(34, 211, 238, 0.04) 0%,
+          rgba(167, 139, 250, 0.04) 50%,
+          transparent 100%);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .hero-eyebrow {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--accent-cyan);
+      margin-bottom: 10px;
+    }
+
+    .hero-title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.5px;
+      line-height: 1.2;
+      margin-bottom: 12px;
+    }
+
+    .hero-title span {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-violet));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-sub {
+      font-size: 14px;
+      color: var(--text-secondary);
+      max-width: 520px;
+      line-height: 1.6;
+    }
+
+    /* Search bar */
+    #portal-search-bar {
+      padding: 20px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+      background: var(--bg-surface);
+    }
+
+    .search-input-wrap {
+      position: relative;
+      flex: 1;
+      max-width: 480px;
+    }
+
+    .search-input-wrap svg {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    #search-input {
+      width: 100%;
+      padding: 9px 12px 9px 38px;
+      background: var(--bg-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 13px;
+      outline: none;
+      transition: border-color var(--transition);
+    }
+
+    #search-input:focus {
+      border-color: var(--border-strong);
+    }
+
+    #search-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .study-count-badge {
+      font-size: 12px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .study-count-badge strong {
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+
+    /* Table header */
+    #studies-table-wrap {
+      flex: 1;
+      padding: 0 32px 48px;
+    }
+
+    #studies-table-header {
+      display: grid;
+      grid-template-columns: 3fr 1fr 1fr 1fr 1fr 0.8fr 80px;
+      gap: 0;
+      padding: 10px 20px;
+      border-bottom: 1px solid var(--border-subtle);
+      margin-top: 12px;
+    }
+
+    .th {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: var(--text-muted);
+    }
+
+    /* Study rows */
+    #studies-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .study-row {
+      display: grid;
+      grid-template-columns: 3fr 1fr 1fr 1fr 1fr 0.8fr 80px;
+      gap: 0;
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border-subtle);
+      cursor: pointer;
+      transition: background var(--transition);
+      align-items: start;
+      text-decoration: none;
+      color: inherit;
+      position: relative;
+    }
+
+    .study-row::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: linear-gradient(180deg, var(--accent-cyan), var(--accent-violet));
+      opacity: 0;
+      transition: opacity var(--transition);
+      border-radius: 0 2px 2px 0;
+    }
+
+    .study-row:hover {
+      background: var(--bg-surface);
+    }
+
+    .study-row:hover::before {
+      opacity: 1;
+    }
+
+
+    .study-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--accent-cyan);
+      margin-bottom: 4px;
+      line-height: 1.3;
+      transition: color var(--transition);
+    }
+
+    .study-row:hover .study-title {
+      color: #7de8f8;
+    }
+
+    .study-cell-count {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+      margin-bottom: 6px;
+    }
+
+    .study-description {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* Tag cells */
+    .study-cell {
+      padding-top: 2px;
+    }
+
+    .study-tag {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 500;
+      border: 1px solid;
+      white-space: nowrap;
+    }
+
+    .tag-disease {
+      background: rgba(34, 211, 238, 0.08);
+      border-color: rgba(34, 211, 238, 0.25);
+      color: var(--accent-cyan);
+    }
+
+    .tag-species {
+      background: rgba(52, 211, 153, 0.08);
+      border-color: rgba(52, 211, 153, 0.25);
+      color: var(--accent-emerald);
+    }
+
+    .tag-assay {
+      background: rgba(167, 139, 250, 0.08);
+      border-color: rgba(167, 139, 250, 0.25);
+      color: var(--accent-violet);
+    }
+
+    .tag-organ {
+      background: rgba(251, 191, 36, 0.08);
+      border-color: rgba(251, 191, 36, 0.25);
+      color: var(--accent-amber);
+    }
+
+    /* Arrow cell */
+    .study-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      color: var(--text-muted);
+      transition: all var(--transition);
+      padding-top: 4px;
+    }
+
+    .study-row:hover .study-arrow {
+      color: var(--accent-cyan);
+      transform: translateX(3px);
+    }
+
+    /* ─── Group header row ─── */
+    .study-group-header {
+      display: grid;
+      grid-template-columns: 3fr 1fr 1fr 1fr 1fr 0.8fr 80px;
+      gap: 0;
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border-subtle);
+      cursor: pointer;
+      transition: background var(--transition);
+      align-items: start;
+      position: relative;
+    }
+
+    .study-group-header::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: linear-gradient(180deg, var(--accent-violet), var(--accent-cyan));
+      opacity: 0;
+      transition: opacity var(--transition);
+      border-radius: 0 2px 2px 0;
+    }
+
+    .study-group-header:hover {
+      background: var(--bg-surface);
+    }
+
+    .study-group-header:hover::before,
+    .study-group-header.open::before {
+      opacity: 1;
+    }
+
+    .study-group-header.open {
+      background: rgba(167, 139, 250, 0.04);
+      border-bottom-color: transparent;
+    }
+
+    .group-expand-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      color: var(--text-muted);
+      transition: all var(--transition);
+      padding-top: 4px;
+    }
+
+    .group-expand-arrow svg {
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .study-group-header.open .group-expand-arrow svg {
+      transform: rotate(90deg);
+    }
+
+    .study-group-header:hover .group-expand-arrow {
+      color: var(--accent-violet);
+    }
+
+    .group-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--accent-violet);
+      margin-bottom: 4px;
+      line-height: 1.3;
+    }
+
+    .group-sample-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 9px;
+      background: rgba(167, 139, 250, 0.12);
+      border: 1px solid rgba(167, 139, 250, 0.3);
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent-violet);
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    /* ─── Sub-rows (samples inside a group) ─── */
+    .study-subrows {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .study-subrows.open {
+      max-height: 2000px;
+    }
+
+    .study-subrow {
+      display: grid;
+      grid-template-columns: 3fr 1fr 1fr 1fr 1fr 0.8fr 80px;
+      gap: 0;
+      padding: 12px 20px 12px 36px;
+      border-bottom: 1px solid rgba(99, 179, 237, 0.05);
+      align-items: center;
+      text-decoration: none;
+      color: inherit;
+      transition: background var(--transition);
+      position: relative;
+      background: rgba(167, 139, 250, 0.02);
+    }
+
+    .study-subrow::before {
+      content: '';
+      position: absolute;
+      left: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 8px;
+      height: 1px;
+      background: rgba(167, 139, 250, 0.3);
+    }
+
+    .study-subrow:hover {
+      background: rgba(167, 139, 250, 0.06);
+    }
+
+    .study-subrow:last-child {
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .subrow-sample-id {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .subrow-cell-count {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .subrow-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      color: var(--text-muted);
+      transition: all var(--transition);
+    }
+
+    .study-subrow:hover .subrow-arrow {
+      color: var(--accent-violet);
+      transform: translateX(3px);
+    }
+
+    /* Empty state */
+    #no-results {
+      display: none;
+      text-align: center;
+      padding: 80px 32px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    /* Floating stats */
+    .portal-stats {
+      display: flex;
+      gap: 24px;
+      margin-top: 24px;
+    }
+
+    .portal-stat {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .portal-stat-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .portal-stat-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="portal-app">
+
+    <!-- Header -->
+    <header id="portal-header">
+      <div class="header-left">
+        <div class="logo">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <circle cx="16" cy="16" r="15" stroke="url(#grad1)" stroke-width="2" />
+            <circle cx="10" cy="12" r="3" fill="#6ee7f7" />
+            <circle cx="22" cy="10" r="2" fill="#a78bfa" />
+            <circle cx="18" cy="22" r="4" fill="#34d399" />
+            <circle cx="8" cy="22" r="2" fill="#f472b6" />
+            <line x1="10" y1="12" x2="22" y2="10" stroke="#6ee7f7" stroke-width="0.8" opacity="0.5" />
+            <line x1="22" y1="10" x2="18" y2="22" stroke="#a78bfa" stroke-width="0.8" opacity="0.5" />
+            <line x1="18" y1="22" x2="8" y2="22" stroke="#34d399" stroke-width="0.8" opacity="0.5" />
+            <defs>
+              <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#6ee7f7" />
+                <stop offset="100%" style="stop-color:#a78bfa" />
+              </linearGradient>
+            </defs>
+          </svg>
+          <span class="logo-text">ImmunoAtlas <span class="logo-version">MVP v0.2</span></span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Hero -->
+    <section id="portal-hero">
+      <div class="hero-eyebrow">Single-cell Immune Repertoire Database</div>
+      <h1 class="hero-title">Browse <span>Studies</span></h1>
+      <p class="hero-sub">
+        Explore interactive single-cell GEX + TCR/BCR datasets.
+        Click a study to visualize UMAP clusters and clonotype distributions.
+      </p>
+      <div class="portal-stats">
+        <div class="portal-stat">
+          <span class="portal-stat-value" id="stat-studies">—</span>
+          <span class="portal-stat-label">Studies</span>
+        </div>
+        <div class="portal-stat">
+          <span class="portal-stat-value" id="stat-total-cells">—</span>
+          <span class="portal-stat-label">Total Cells</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Search bar -->
+    <div id="portal-search-bar">
+      <div class="search-input-wrap">
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+          <path
+            d="M6.5 1a5.5 5.5 0 1 0 3.67 9.61l3.06 3.07a.75.75 0 1 0 1.06-1.06L11.2 9.55A5.5 5.5 0 0 0 6.5 1Zm0 1.5a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z"
+            fill="currentColor" />
+        </svg>
+        <input type="text" id="search-input" placeholder="Search studies by title, disease, species…"
+          autocomplete="off">
+      </div>
+      <span class="study-count-badge"><strong id="visible-count">1</strong> study found</span>
+    </div>
+
+    <!-- Table -->
+    <div id="studies-table-wrap">
+      <div id="studies-table-header">
+        <div class="th">Study</div>
+        <div class="th">Disease</div>
+        <div class="th">Species</div>
+        <div class="th">Assay</div>
+        <div class="th">Organ</div>
+        <div class="th">Shannon</div>
+        <div class="th"></div>
+      </div>
+
+      <div id="studies-list">
+        <!-- rows injected by JS -->
+      </div>
+
+      <div id="no-results">
+        No studies match your search.
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ── FALLBACK studies (studies.json がない場合に使用) ──────
+    const FALLBACK_STUDIES = [
+      {
+        id: 'mvp_sample',
+        title: 'ALEW Cohort — MVP Single-cell Immune Repertoire',
+        description: 'Single-cell GEX + TCR/BCR profiling of human PBMC using 10x Genomics 5\u2032 chemistry.',
+        disease: 'Diseased', severity: '', species: 'Homo sapiens',
+        assay: '10x 5\u2032 GEX + TCR/BCR', organ: 'PBMC',
+        viewerUrl: '/webapp/viewer.html?sample=mvp',
+        dataUrl: '/output/umap_data.json', qs2Url: '/output/seurat_MVP_Sample.qs2',
+      },
+      {
+        id: 'gse145926_c141',
+        title: 'Single-cell landscape of bronchoalveolar immune cells in patients with COVID-19 [C141]',
+        description: 'Respiratory immune characteristics associated with COVID-19 severity. Liao M et al. Nature Medicine 2020. DOI:10.1038/s41591-020-0901-9 (GEO: GSE145926, Sample C141)',
+        disease: 'COVID-19', severity: 'Moderate', species: 'Homo sapiens',
+        assay: '10x 5\u2032 GEX + TCR', organ: 'BALF',
+        viewerUrl: '/webapp/viewer.html?sample=gse145926_c141',
+        dataUrl: '/output/umap_data_GSE145926_C141.json',
+        qs2Url: '/output/seurat_GSE145926_C141.qs2',
+      },
+    ];
+
+    /* ── Render ── */
+    const studiesList = document.getElementById('studies-list');
+    const searchInput = document.getElementById('search-input');
+    const noResults = document.getElementById('no-results');
+    const visibleCount = document.getElementById('visible-count');
+    const statStudies = document.getElementById('stat-studies');
+    const statTotalCells = document.getElementById('stat-total-cells');
+
+    function fmt(n) { return n == null ? '—' : n.toLocaleString(); }
+
+    function severityColor(sev) {
+      if (!sev) return '';
+      if (sev === 'Severe') return 'background:rgba(244,114,182,0.1);border-color:rgba(244,114,182,0.3);color:#f472b6';
+      if (sev === 'Moderate') return 'background:rgba(251,191,36,0.1);border-color:rgba(251,191,36,0.3);color:#fbbf24';
+      if (sev === 'Healthy') return 'background:rgba(52,211,153,0.1);border-color:rgba(52,211,153,0.3);color:#34d399';
+      return '';
+    }
+
+    // ── Extract sample ID label from title like "... [C141]" ──
+    function extractSampleLabel(study) {
+      const m = study.title.match(/\[([^\]]+)\]\s*$/);
+      return m ? m[1] : study.id;
+    }
+
+    // ── Single standalone study row ──
+    function renderRow(study) {
+      const row = document.createElement('a');
+      row.className = 'study-row';
+      row.href = study.viewerUrl;
+      row.id = `study-row-${study.id}`;
+      row.dataset.search = [study.title, study.disease, study.severity || '',
+      study.species, study.assay, study.organ].join(' ').toLowerCase();
+
+      const cellLabel = study.cellCount != null ? `${fmt(study.cellCount)} Cells` : 'Loading…';
+      const sevBadge = study.severity
+        ? `<span class="study-tag" style="${severityColor(study.severity)};margin-left:6px">${study.severity}</span>`
+        : '';
+
+      row.innerHTML = `
+        <div class="study-main">
+          <div class="study-title">${study.title}${sevBadge}</div>
+          <div class="study-cell-count" id="cell-count-${study.id}">${cellLabel}</div>
+          <div class="study-description">${study.description}</div>
+        </div>
+        <div class="study-cell"><span class="study-tag tag-disease">${study.disease}</span></div>
+        <div class="study-cell"><span class="study-tag tag-species">${study.species}</span></div>
+        <div class="study-cell"><span class="study-tag tag-assay">${study.assay}</span></div>
+        <div class="study-cell"><span class="study-tag tag-organ">${study.organ}</span></div>
+        <div class="study-cell"><span style="font-family:'JetBrains Mono';font-size:12px;color:var(--text-secondary)">${study.shannonIndex != null ? study.shannonIndex.toFixed(2) : '—'}</span></div>
+        <div class="study-arrow">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M7 4l5 5-5 5" stroke="currentColor" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>`;
+      return row;
+    }
+
+    // ── Group header + sub-rows ──
+    function renderGroup(groupId, samples) {
+      const first = samples[0];
+      const groupTitle = first.studyGroupTitle || first.title.replace(/\s*\[[^\]]+\]\s*$/, '');
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'study-group-wrapper';
+      wrapper.dataset.search = [groupTitle, first.disease, first.species,
+        first.assay, first.organ, ...samples.map(s => s.severity || '')]
+        .join(' ').toLowerCase();
+
+      // Shannon info for group
+      const validShannon = samples.filter(s => s.shannonIndex != null).map(s => s.shannonIndex);
+      const allShannonLoaded = validShannon.length > 0;
+      const avgShannon = allShannonLoaded ? (validShannon.reduce((a, b) => a + b, 0) / validShannon.length) : 0;
+
+      // ── header row ──
+      const header = document.createElement('div');
+      header.className = 'study-group-header';
+      header.id = `group-header-${groupId}`;
+
+      header.innerHTML = `
+        <div class="study-main">
+          <div class="group-title">
+            ${groupTitle}
+            <span class="group-sample-badge">${samples.length} samples</span>
+          </div>
+          <div class="study-cell-count" id="group-cell-count-${groupId}">Loading…</div>
+          <div class="study-description">${first.description}</div>
+        </div>
+        <div class="study-cell"><span class="study-tag tag-disease">${first.disease}</span></div>
+        <div class="study-cell"><span class="study-tag tag-species">${first.species}</span></div>
+        <div class="study-cell"><span class="study-tag tag-assay">${first.assay}</span></div>
+        <div class="study-cell"><span class="study-tag tag-organ">${first.organ}</span></div>
+        <div class="study-cell"><span style="font-family:'JetBrains Mono';font-size:12px;color:var(--text-secondary)">${allShannonLoaded ? avgShannon.toFixed(2) : '—'}</span></div>
+        <div class="group-expand-arrow">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M7 4l5 5-5 5" stroke="currentColor" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>`;
+
+      // ── sub-rows container ──
+      const subrows = document.createElement('div');
+      subrows.className = 'study-subrows';
+
+      samples.forEach(study => {
+        const sampleLabel = extractSampleLabel(study);
+        const sevBadge = study.severity
+          ? `<span class="study-tag" style="${severityColor(study.severity)};margin-left:6px;font-size:10px">${study.severity}</span>`
+          : '';
+
+        const subrow = document.createElement('a');
+        subrow.className = 'study-subrow';
+        subrow.href = study.viewerUrl;
+        subrow.innerHTML = `
+          <div>
+            <div class="subrow-sample-id">${sampleLabel}${sevBadge}</div>
+            <div class="subrow-cell-count" id="cell-count-${study.id}">Loading…</div>
+          </div>
+          <div></div><div></div><div></div><div></div>
+          <div class="study-cell"><span style="font-family:'JetBrains Mono';font-size:12px;color:var(--text-muted)">${study.shannonIndex != null ? study.shannonIndex.toFixed(2) : '—'}</span></div>
+          <div class="subrow-arrow">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.6"
+                    stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>`;
+        subrows.appendChild(subrow);
+      });
+
+      // ── toggle on header click ──
+      header.addEventListener('click', () => {
+        const isOpen = header.classList.contains('open');
+        header.classList.toggle('open', !isOpen);
+        subrows.classList.toggle('open', !isOpen);
+      });
+
+      wrapper.appendChild(header);
+      wrapper.appendChild(subrows);
+      return wrapper;
+    }
+
+    // ── Group studies by studyGroup field ──
+    function groupStudies(studies) {
+      const groups = new Map();
+      studies.forEach(s => {
+        const gid = s.studyGroup || s.id;
+        if (!groups.has(gid)) groups.set(gid, []);
+        groups.get(gid).push(s);
+      });
+      return groups;
+    }
+
+    function initStudies(studies) {
+      studiesList.innerHTML = '';
+      const groups = groupStudies(studies);
+
+      // Count: standalone = 1, group = 1
+      statStudies.textContent = fmt(groups.size);
+      visibleCount.textContent = groups.size;
+
+      groups.forEach((samples, groupId) => {
+        let el;
+        if (samples.length === 1) {
+          el = renderRow(samples[0]);
+        } else {
+          el = renderGroup(groupId, samples);
+        }
+        studiesList.appendChild(el);
+      });
+
+      // Async: cell count per sample (studies.json に既にある場合はそれを使う)
+      let totalCells = 0;
+      let loadedStudies = 0;
+
+      studies.forEach(async (study) => {
+        // studies.json に cellCount があるならフェッチ不要
+        if (study.cellCount != null) {
+          const el = document.getElementById(`cell-count-${study.id}`);
+          if (el) el.textContent = `${fmt(study.cellCount)} cells`;
+
+          updateGroupTotals(study);
+          checkAllLoaded();
+        } else {
+          try {
+            const res = await fetch(study.dataUrl);
+            const data = await res.json();
+            study.cellCount = data.length;
+            const el = document.getElementById(`cell-count-${study.id}`);
+            if (el) el.textContent = `${fmt(study.cellCount)} cells`;
+
+            updateGroupTotals(study);
+            checkAllLoaded();
+          } catch (e) {
+            console.warn('Cell count failed:', study.id, e);
+          }
+        }
+      });
+
+      function updateGroupTotals(study) {
+        const gid = study.studyGroup || study.id;
+        const groupEl = document.getElementById(`group-cell-count-${gid}`);
+        if (groupEl) {
+          const siblings = studies.filter(s => (s.studyGroup || s.id) === gid);
+          const groupTotal = siblings.reduce((sum, s) => sum + (s.cellCount || 0), 0);
+          const allLoaded = siblings.every(s => s.cellCount != null);
+          groupEl.textContent = allLoaded
+            ? `${fmt(groupTotal)} cells total · ${siblings.length} samples`
+            : `${fmt(groupTotal)}+ cells · loading…`;
+        }
+        totalCells = studies.reduce((s, st) => s + (st.cellCount || 0), 0);
+        statTotalCells.textContent = fmt(totalCells);
+      }
+
+      function checkAllLoaded() {
+        loadedStudies++;
+      }
+
+      // Search across groups
+      searchInput.addEventListener('input', () => {
+        const q = searchInput.value.trim().toLowerCase();
+        let visible = 0;
+        document.querySelectorAll('.study-row, .study-group-wrapper').forEach(el => {
+          const searchStr = el.dataset.search || '';
+          const match = !q || searchStr.includes(q);
+          el.style.display = match ? '' : 'none';
+          if (match) visible++;
+        });
+        visibleCount.textContent = visible;
+        noResults.style.display = visible === 0 ? 'block' : 'none';
+      });
+    }
+
+    // ── Load studies.json, fallback to hardcoded ──────────────
+    fetch('/output/studies.json')
+      .then(r => { if (!r.ok) throw new Error('not found'); return r.json(); })
+      .then(studies => {
+        console.log('[ImmunoAtlas] Loaded studies.json:', studies.length, 'entries');
+        initStudies(studies);
+      })
+      .catch(() => {
+        console.warn('[ImmunoAtlas] studies.json not found, using fallback.');
+        initStudies(FALLBACK_STUDIES);
+      });
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UMAP Viewer | ImmunoAtlas</title>
+  <meta name="description"
+    content="Interactive single-cell immune repertoire explorer. Visualize UMAP clusters and TCR/BCR clonotype distributions on 10x Genomics data.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <link rel="stylesheet" href="style.css?v=2">
+</head>
+
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header id="site-header">
+      <div class="header-left">
+        <div class="logo">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <circle cx="16" cy="16" r="15" stroke="url(#grad1)" stroke-width="2" />
+            <circle cx="10" cy="12" r="3" fill="#6ee7f7" />
+            <circle cx="22" cy="10" r="2" fill="#a78bfa" />
+            <circle cx="18" cy="22" r="4" fill="#34d399" />
+            <circle cx="8" cy="22" r="2" fill="#f472b6" />
+            <line x1="10" y1="12" x2="22" y2="10" stroke="#6ee7f7" stroke-width="0.8" opacity="0.5" />
+            <line x1="22" y1="10" x2="18" y2="22" stroke="#a78bfa" stroke-width="0.8" opacity="0.5" />
+            <line x1="18" y1="22" x2="8" y2="22" stroke="#34d399" stroke-width="0.8" opacity="0.5" />
+            <defs>
+              <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#6ee7f7" />
+                <stop offset="100%" style="stop-color:#a78bfa" />
+              </linearGradient>
+            </defs>
+          </svg>
+          <span class="logo-text">ImmunoAtlas <span class="logo-version">MVP v0.2</span></span>
+        </div>
+        <a href="index.html" id="back-btn" title="Back to studies">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" />
+          </svg>
+          Studies
+        </a>
+      </div>
+      <div class="header-center">
+        <div class="sample-switcher" id="sample-switcher">
+          <button class="sample-switcher-btn" id="sample-switcher-btn" title="Switch sample">
+            <span class="sample-badge" id="sample-badge">—</span>
+            <svg id="sample-switcher-chevron" width="13" height="13" viewBox="0 0 13 13" fill="none"
+              style="margin-left:6px;opacity:0;transition:opacity 0.2s">
+              <path d="M3 5l3.5 3.5L10 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+                stroke-linejoin="round" />
+            </svg>
+          </button>
+          <div class="sample-dropdown" id="sample-dropdown"></div>
+        </div>
+      </div>
+      <div id="header-right" class="header-right">
+        <div id="cell-counter" class="stat-pill">
+          <span class="stat-label">Cells</span>
+          <span id="total-cells" class="stat-value">—</span>
+        </div>
+        <div id="selected-counter" class="stat-pill highlight">
+          <span class="stat-label">Selected</span>
+          <span id="selected-cells" class="stat-value">0</span>
+        </div>
+        <button id="btn-download-qs2" class="download-qs2-btn" disabled title="Checking qs2 file…">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M7 1v7M4 5.5l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+              stroke-linejoin="round" />
+            <path d="M2 11h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+          Download .qs2
+        </button>
+      </div>
+    </header>
+
+    <!-- Loading overlay -->
+    <div id="loading-overlay">
+      <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <p class="loading-text">Loading immune repertoire data…</p>
+        <div class="loading-bar">
+          <div id="loading-progress"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main layout -->
+    <main id="main-layout">
+      <!-- Left panel: Controls -->
+      <aside id="left-panel">
+        <div class="panel-section">
+          <div class="section-header">
+            <h2>View Mode</h2>
+          </div>
+          <div class="btn-group" id="color-mode-group">
+            <button class="mode-btn active" data-mode="cluster" id="btn-cluster">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <circle cx="4" cy="4" r="3" fill="currentColor" opacity="0.7" />
+                <circle cx="10" cy="10" r="3" fill="currentColor" />
+              </svg>
+              Clusters
+            </button>
+            <button class="mode-btn" data-mode="tcr" id="btn-tcr">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M2 7L7 2l5 5-5 5z" stroke="currentColor" stroke-width="1.5" fill="none" />
+              </svg>
+              TCR
+            </button>
+            <button class="mode-btn" data-mode="bcr" id="btn-bcr">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="2" y="2" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.5" fill="none" />
+              </svg>
+              BCR
+            </button>
+            <button class="mode-btn" data-mode="gene" id="btn-gene">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M3 2c0 2 3 2 3 4s-3 2-3 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"
+                  fill="none" />
+                <path d="M11 2c0 2-3 2-3 4s3 2 3 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"
+                  fill="none" />
+              </svg>
+              Gene Expr
+            </button>
+            <button class="mode-btn mode-disabled" data-mode="sample" id="btn-sample" style="display:none">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <circle cx="4" cy="5" r="2" stroke="currentColor" stroke-width="1.4" fill="none" />
+                <circle cx="10" cy="5" r="2" stroke="currentColor" stroke-width="1.4" fill="none" />
+                <circle cx="7" cy="10" r="2" stroke="currentColor" stroke-width="1.4" fill="none" />
+              </svg>
+              Sample
+            </button>
+            <button class="mode-btn mode-disabled" data-mode="severity" id="btn-severity" style="display:none">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M7 2l1.5 3h3l-2.5 2 1 3L7 8.5 4 10l1-3L2.5 5h3z" stroke="currentColor" stroke-width="1.3"
+                  fill="none" />
+              </svg>
+              Severity
+            </button>
+          </div>
+
+          <!-- TCR: Color By sub-options -->
+
+          <div id="tcr-colorby-group" class="colorby-group" style="display:none">
+            <div class="colorby-label">Color by</div>
+            <div class="colorby-pills">
+              <button class="colorby-pill active" data-mode="tcr" data-field="clone">Clone</button>
+              <button class="colorby-pill" data-mode="tcr" data-field="trav">TRAV</button>
+              <button class="colorby-pill" data-mode="tcr" data-field="trbv">TRBV</button>
+              <button class="colorby-pill" data-mode="tcr" data-field="traj">TRAJ</button>
+              <button class="colorby-pill" data-mode="tcr" data-field="trbj">TRBJ</button>
+              <button class="colorby-pill" data-mode="tcr" data-field="cdr3a">CDR3α</button>
+              <button class="colorby-pill" data-mode="tcr" data-field="cdr3b">CDR3β</button>
+              <button class="colorby-pill" data-mode="tcr" data-field="cdr3a_len">α Len</button>
+              <button class="colorby-pill" data-mode="tcr" data-field="cdr3b_len">β Len</button>
+            </div>
+          </div>
+
+          <!-- BCR: Color By sub-options -->
+          <div id="bcr-colorby-group" class="colorby-group" style="display:none">
+            <div class="colorby-label">Color by</div>
+            <div class="colorby-pills">
+              <button class="colorby-pill active" data-mode="bcr" data-field="clone">Clone</button>
+              <button class="colorby-pill" data-mode="bcr" data-field="ighv">IGHV</button>
+              <button class="colorby-pill" data-mode="bcr" data-field="lv">IGLV/IGKV</button>
+              <button class="colorby-pill" data-mode="bcr" data-field="cdr3h">CDR3H</button>
+              <button class="colorby-pill" data-mode="bcr" data-field="cdr3l">CDR3L</button>
+            </div>
+          </div>
+
+          <!-- Gene Expr: gene name input -->
+          <div id="gene-expr-group" class="colorby-group" style="display:none">
+            <div class="colorby-label">Gene name</div>
+            <div class="gene-input-wrap">
+              <svg class="gene-input-icon" width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <path d="M3 1c0 1.5 2.5 1.5 2.5 3S3 5.5 3 7" stroke="currentColor" stroke-width="1.3"
+                  stroke-linecap="round" fill="none" />
+                <path d="M10 1c0 1.5-2.5 1.5-2.5 3S10 5.5 10 7" stroke="currentColor" stroke-width="1.3"
+                  stroke-linecap="round" fill="none" />
+                <circle cx="6.5" cy="10" r="1.5" fill="currentColor" opacity="0.6" />
+              </svg>
+              <div id="gene-autocomplete" class="gene-autocomplete" style="display:none"></div>
+              <input type="text" id="gene-input" class="gene-search-input" placeholder="e.g. CD8A, IL7R, FOXP3"
+                autocomplete="off" spellcheck="false" />
+              <button id="gene-input-clear" class="gene-input-clear" title="Clear">✕</button>
+            </div>
+            <div id="gene-expr-status" class="gene-expr-status"></div>
+            <div id="gene-expr-scale" class="gene-expr-scale" style="display:none">
+              <div class="gene-scale-bar"></div>
+              <div class="gene-scale-labels">
+                <span>0</span>
+                <span id="gene-scale-max">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+        <!-- Cluster filter -->
+        <div class="panel-section" id="cluster-section">
+          <div class="section-header">
+            <h2>Clusters</h2>
+            <button class="small-btn" id="select-all-clusters">All</button>
+          </div>
+          <div id="cluster-legend" class="legend-grid"></div>
+        </div>
+
+        <!-- Sample filter (Merged Studyのみ表示) -->
+        <div class="panel-section" id="sample-filter-section" style="display:none">
+          <div class="section-header">
+            <h2>Samples</h2>
+            <button class="small-btn" id="select-all-samples">All</button>
+          </div>
+          <div id="sample-filter-legend" class="legend-grid"></div>
+        </div>
+
+        <!-- Clonotype list -->
+        <div class="panel-section" id="clonotype-section" style="display:none">
+          <div class="section-header">
+            <h2 id="clone-section-title">Top Clonotypes</h2>
+          </div>
+          <div class="clone-search-wrap">
+            <svg class="clone-search-icon" width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <circle cx="5.5" cy="5.5" r="4.5" stroke="currentColor" stroke-width="1.5" />
+              <path d="M9 9l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+            </svg>
+            <input type="text" id="clone-search" class="clone-search-input" placeholder="Search… e.g. TRAV, J6, CASSF"
+              autocomplete="off" spellcheck="false" />
+            <button id="clone-search-clear" class="clone-search-clear-btn" title="Clear search">✕</button>
+          </div>
+          <div id="clone-list" class="clone-list"></div>
+          <button class="clear-btn" id="clear-clone">✕ Clear Selection</button>
+        </div>
+
+        <!-- Stats -->
+        <div class="panel-section" id="stats-section">
+          <div class="section-header">
+            <h2>Statistics</h2>
+          </div>
+          <div class="stat-grid">
+            <div class="stat-card">
+              <div class="stat-card-value" id="stat-total-cells">—</div>
+              <div class="stat-card-label">Total Cells</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-value" id="stat-tcr-cells">—</div>
+              <div class="stat-card-label">TCR+ Cells</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-value" id="stat-bcr-cells">—</div>
+              <div class="stat-card-label">BCR+ Cells</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-value" id="stat-clusters">—</div>
+              <div class="stat-card-label">Clusters</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-value" id="stat-shannon">—</div>
+              <div class="stat-card-label">Shannon Index</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-value" id="stat-clones">—</div>
+              <div class="stat-card-label">Clone Count</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Right panel: UMAP plot & Diversity -->
+      <section id="right-panel">
+        <div class="right-panel-header"
+          style="position:absolute; top:10px; right:10px; z-index:10; display:flex; gap:0.5rem; background:rgba(15,23,42,0.8); padding:0.4rem; border-radius:8px; border:1px solid rgba(255,255,255,0.05); display:none;"
+          id="plot-mode-controls">
+          <button id="btn-plot-umap" class="plot-toggle-btn active"
+            style="width:auto; padding:0.4rem 0.8rem; font-size:12px; margin:0;">UMAP</button>
+          <button id="btn-plot-diversity" class="plot-toggle-btn"
+            style="width:auto; padding:0.4rem 0.8rem; font-size:12px; margin:0;" title="Shannon Index per Sample">Clonal
+            Diversity</button>
+        </div>
+
+        <div id="umap-container">
+          <div id="umap-plot"></div>
+        </div>
+
+        <!-- Diversity Plot Overlay -->
+        <div id="diversity-overlay"
+          style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:var(--bg-dark); z-index:5; justify-content:center; align-items:center; flex-direction:column;">
+          <div id="diversity-plot-container" style="width:90%; height:90%;"></div>
+        </div>
+        <!-- Hover tooltip -->
+        <div id="cell-tooltip" class="tooltip hidden">
+          <div class="tooltip-header">Cell Info</div>
+          <div id="tooltip-content"></div>
+        </div>
+        <!-- Legend for clone mode -->
+        <div id="clone-legend-overlay" class="hidden">
+          <div class="clone-legend-inner">
+            <div class="legend-item"><span class="dot" style="background:#f472b6"></span>Selected Clone</div>
+            <div class="legend-item"><span class="dot" style="background:#334155"></span>Other Cells</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // URLパラメータを確実に読む（キャッシュ非依存）
+    const _params = new URLSearchParams(location.search);
+    window.IMMUNOATLAS_SAMPLE = _params.get('sample') || 'mvp';
+    window.IMMUNOATLAS_STUDY = _params.get('study') || null;
+    // ?study= が指定された場合はStudy-level merged modeを使用
+    if (window.IMMUNOATLAS_STUDY) {
+      window.IMMUNOATLAS_SAMPLE = '__study__' + window.IMMUNOATLAS_STUDY;
+    }
+  </script>
+  <script src="app.js?v=13"></script>
+</body>
+
+</html>
